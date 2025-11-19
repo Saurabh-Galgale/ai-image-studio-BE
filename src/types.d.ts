@@ -12,6 +12,6 @@ export interface Generation {
   style?: string;
   input_image_path?: string;
   result_image_path?: string;
-  status: 'pending' | 'completed' | 'failed';
+  status: "pending" | "completed" | "failed";
   created_at: string;
 }

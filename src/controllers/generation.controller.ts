@@ -1,10 +1,13 @@
-import { Request, Response } from 'express';
-import { z } from 'zod';
-import { AuthRequest } from '../middleware/auth.middleware';
-import { createGenerationRecord, getGenerationsForUser } from '../services/generation.service';
-import path from 'path';
-import fs from 'fs';
-import { sleep } from '../utils/sleep';
+import { Request, Response } from "express";
+import { z } from "zod";
+import { AuthRequest } from "../middleware/auth.middleware";
+import {
+  createGenerationRecord,
+  getGenerationsForUser,
+} from "../services/generation.service";
+import path from "path";
+import fs from "fs";
+import { sleep } from "../utils/sleep";
 
 // Validation schema for query params
 const getSchema = z.object({
@@ -12,7 +15,18 @@ const getSchema = z.object({
 });
 
 // Allowed styles (3+)
-const ALLOWED_STYLES = ['cartoon', '3d-render', 'oil-painting', 'editorial'];
+const ALLOWED_STYLES = ["cartoon", "3d-render", "oil-painting", "editorial"];
+
+/**
+ * Normalize Zod issues into a stable shape for JSON responses.
+ * Convert each path element to string to avoid symbol/other types.
+ */
+function mapZodIssues(issues: z.ZodIssue[]) {
+  return issues.map((i) => ({
+    path: i.path.map((p) => String(p)),
+    message: i.message,
+  }));
+}
 
 export async function postGenerationHandler(req: AuthRequest, res: Response) {
   // multipart handled by multer
@@ -22,17 +36,19 @@ export async function postGenerationHandler(req: AuthRequest, res: Response) {
 
   // basic validation
   if (!file) {
-    return res
-      .status(400)
-      .json({ error: { code: 'VALIDATION_ERROR', message: 'Image file required' } });
+    return res.status(400).json({
+      error: { code: "VALIDATION_ERROR", message: "Image file required" },
+    });
   }
   if (prompt && prompt.length > 1000) {
-    return res
-      .status(400)
-      .json({ error: { code: 'VALIDATION_ERROR', message: 'Prompt too long' } });
+    return res.status(400).json({
+      error: { code: "VALIDATION_ERROR", message: "Prompt too long" },
+    });
   }
   if (style && !ALLOWED_STYLES.includes(style)) {
-    return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid style' } });
+    return res
+      .status(400)
+      .json({ error: { code: "VALIDATION_ERROR", message: "Invalid style" } });
   }
 
   // Simulate processing delay 1-2s
@@ -40,11 +56,11 @@ export async function postGenerationHandler(req: AuthRequest, res: Response) {
 
   // 20% overload
   if (Math.random() < 0.2) {
-    return res.status(503).json({ message: 'Model overloaded' });
+    return res.status(503).json({ message: "Model overloaded" });
   }
 
   // For this mock, we'll "pretend" the result image is same as input (copy file)
-  const uploadDir = process.env.UPLOAD_DIR || 'uploads';
+  const uploadDir = process.env.UPLOAD_DIR || "uploads";
   const ext = path.extname(file.filename);
   const resultFilename = `result-${file.filename}`;
   const sourcePath = path.join(uploadDir, file.filename);
@@ -61,7 +77,7 @@ export async function postGenerationHandler(req: AuthRequest, res: Response) {
     style,
     `/uploads/${file.filename}`,
     `/uploads/${resultFilename}`,
-    'completed',
+    "completed"
   );
 
   res.status(201).json({
@@ -78,7 +94,11 @@ export function getGenerationsHandler(req: AuthRequest, res: Response) {
   const parsed = getSchema.safeParse(req.query);
   if (!parsed.success) {
     return res.status(400).json({
-      error: { code: 'VALIDATION_ERROR', message: 'Invalid query', details: parsed.error.errors },
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Invalid query",
+        details: mapZodIssues(parsed.error.issues),
+      },
     });
   }
   const limit = parsed.data.limit || 5;
